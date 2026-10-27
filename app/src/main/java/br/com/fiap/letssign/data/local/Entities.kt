@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Relation
 import br.com.fiap.letssign.domain.model.AuditEventType
 import br.com.fiap.letssign.domain.model.DocumentStatus
+import br.com.fiap.letssign.domain.model.FieldType
 import br.com.fiap.letssign.domain.model.SignatureType
 import br.com.fiap.letssign.domain.model.SignerClassification
 import br.com.fiap.letssign.domain.model.SignerStatus
@@ -24,7 +25,7 @@ data class UserEntity(
     val email: String,
     val phone: String,
     val password: String,
-    val legalDocument: String = "", // CPF ou OAB opcional para o carimbo jurídico
+    val legalDocument: String = "",
     val role: UserRole,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -128,6 +129,7 @@ data class SignatureFieldEntity(
     val widthRatio: Float,
     /** Altura normalizada (0.0 a 1.0) relativa à altura da página do PDF */
     val heightRatio: Float,
+    val fieldType: FieldType = FieldType.RUBRICA,
     val isSigned: Boolean = false,
     val signedAt: Long? = null,
     val signatureImagePath: String? = null,

@@ -51,6 +51,7 @@ fun LetsSignAppNavigation(viewModel: LetsSignViewModel) {
     val allSigners by viewModel.allSigners.collectAsState()
     val adminDocs by viewModel.adminDocuments.collectAsState()
     val signerDocs by viewModel.signerDocuments.collectAsState()
+    val allAuditEvents by viewModel.allAuditEvents.collectAsState()
     val wizardState by viewModel.wizardState.collectAsState()
 
     LaunchedEffect(uiNotification) {
@@ -93,8 +94,13 @@ fun LetsSignAppNavigation(viewModel: LetsSignViewModel) {
                     adminUser = user,
                     documents = adminDocs,
                     signers = allSigners,
+                    auditEvents = allAuditEvents,
                     onStartNewDocument = {
                         viewModel.startNewDocumentWizard()
+                        navController.navigate("wizard")
+                    },
+                    onImportPdfFromGallery = { uri ->
+                        viewModel.startNewDocumentWizardWithPdf(context, uri)
                         navController.navigate("wizard")
                     },
                     onOpenDocumentDetails = { docId ->
@@ -111,6 +117,16 @@ fun LetsSignAppNavigation(viewModel: LetsSignViewModel) {
                             onSuccess = onSuccess,
                             onError = onError
                         )
+                    },
+                    onDeleteSigner = { userId, onSuccess, onError ->
+                        viewModel.deleteSigner(
+                            userId = userId,
+                            onSuccess = onSuccess,
+                            onError = onError
+                        )
+                    },
+                    onRecordShare = { docId, channel ->
+                        viewModel.recordInviteShared(docId, channel)
                     },
                     onLogout = {
                         viewModel.logout()
@@ -215,6 +231,14 @@ fun LetsSignAppNavigation(viewModel: LetsSignViewModel) {
                             verificationToken = token,
                             certificateInfo = certInfo,
                             onSuccess = { onSuccess() },
+                            onError = onError
+                        )
+                    },
+                    onRejectDocument = { reason, onSuccess, onError ->
+                        viewModel.rejectDocumentAsCurrentSigner(
+                            documentId = docId,
+                            reason = reason,
+                            onSuccess = onSuccess,
                             onError = onError
                         )
                     },

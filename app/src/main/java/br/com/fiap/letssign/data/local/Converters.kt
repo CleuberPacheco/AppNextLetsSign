@@ -3,6 +3,7 @@ package br.com.fiap.letssign.data.local
 import androidx.room.TypeConverter
 import br.com.fiap.letssign.domain.model.AuditEventType
 import br.com.fiap.letssign.domain.model.DocumentStatus
+import br.com.fiap.letssign.domain.model.FieldType
 import br.com.fiap.letssign.domain.model.SignatureType
 import br.com.fiap.letssign.domain.model.SignerClassification
 import br.com.fiap.letssign.domain.model.SignerStatus
@@ -27,6 +28,13 @@ class Converters {
 
     @TypeConverter
     fun toSignatureType(value: String): SignatureType = SignatureType.valueOf(value)
+
+    @TypeConverter
+    fun fromFieldType(value: FieldType): String = value.name
+
+    @TypeConverter
+    fun toFieldType(value: String): FieldType =
+        runCatching { FieldType.valueOf(value) }.getOrDefault(FieldType.RUBRICA)
 
     @TypeConverter
     fun fromDocumentStatus(value: DocumentStatus): String = value.name

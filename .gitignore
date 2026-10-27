@@ -17,3 +17,5 @@ bin/
 gen/
 out/
 release/
+
+*.hprof

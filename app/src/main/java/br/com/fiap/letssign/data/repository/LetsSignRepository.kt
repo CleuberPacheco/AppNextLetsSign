@@ -22,8 +22,30 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
- * Contrato de Repositório estruturado para suportar persistência local via Room
- * e futura sincronização/persistência via APIs REST (LetsSignApiService).
+ * =================================================================================================
+ * Contrato de Repositório do AssinaJÁ — Plataforma Corporativa de Assinatura e Gestão de Documentos
+ * =================================================================================================
+ *
+ * GUIA DO DESENVOLVEDOR (Visão de Arquitetura & Troubleshooting):
+ *
+ * 1. POR QUE ESTA INTERFACE EXISTE?
+ *    Esta interface isola a camada de apresentação (ViewModels e Telas Compose) dos detalhes de como
+ *    e onde os dados são salvos. Ela permite que a UI nunca converse diretamente com o Room SQLite
+ *    ou com chamadas de rede HTTP.
+ *
+ * 2. COMO MIGRAR OU INTEGRAR COM BACKEND / REST APIS NO FUTURO:
+ *    - Atualmente, usamos `LocalLetsSignRepositoryImpl`, que persiste localmente via Room SQLite.
+ *    - Para conectar a um servidor REST no futuro:
+ *        a) Crie uma classe `RemoteLetsSignRepositoryImpl` ou altere a implementação atual para
+ *           usar o padrão "NetworkBoundResource" (Cache-First).
+ *        b) Salve os dados recebidos via API diretamente no banco Room, e deixe que a UI continue
+ *           apenas observando os `Flow` do Room. Assim o app mantém funcionamento offline perfeito!
+ *
+ * 3. TROUBLESHOOTING FREQUENTE:
+ *    - Erro de Foreign Key ao disparar documento: certifique-se de que os IDs dos signatários
+ *      selecionados já existem na tabela `users` antes de vincular em `document_signers`.
+ *    - Hash SHA-256 divergente: O hash é recalculado a cada nova rubrica gravada. Se o PDF mudar
+ *      fora do fluxo, o hash não baterá com a cadeia de custódia.
  */
 interface LetsSignRepository {
     suspend fun ensureDefaultAdminExists()
@@ -38,11 +60,13 @@ interface LetsSignRepository {
         password: String,
         legalDocument: String
     ): Result<UserEntity>
+    suspend fun deleteSigner(signerUserId: Long): Result<Unit>
 
     fun observeAllDocumentsForAdmin(): Flow<List<DocumentFullDetails>>
     fun observeDocumentsForSigner(signerUserId: Long): Flow<List<DocumentFullDetails>>
     fun observeDocumentDetails(documentId: Long): Flow<DocumentFullDetails?>
     suspend fun getDocumentDetails(documentId: Long): DocumentFullDetails?
+    fun observeAllAuditEvents(): Flow<List<AuditEventEntity>>
 
     suspend fun dispatchDocumentForSignature(
         idempotencyKey: String,
@@ -66,6 +90,12 @@ interface LetsSignRepository {
         signerUser: UserEntity
     )
 
+    suspend fun recordInviteShared(
+        documentId: Long,
+        channel: String,
+        actor: UserEntity
+    )
+
     suspend fun signDocument(
         context: Context,
         documentId: Long,
@@ -74,6 +104,12 @@ interface LetsSignRepository {
         verificationToken: String?,
         certificateInfo: String?
     ): Result<DocumentFullDetails>
+
+    suspend fun rejectDocument(
+        documentId: Long,
+        signerUser: UserEntity,
+        reason: String
+    ): Result<DocumentFullDetails>
 }
 
 class LocalLetsSignRepositoryImpl(
@@ -81,20 +117,84 @@ class LocalLetsSignRepositoryImpl(
     @Suppress("unused") private val remoteApi: LetsSignApiService? = null
 ) : LetsSignRepository {
 
+    /**
+     * Inicializa os dados padrão do sistema de forma idempotente e segura.
+     *
+     * DICA PARA QUEM ESTÁ DANDO MANUTENÇÃO / TROUBLESHOOT:
+     * - Cria o usuário Administrador oficial (admin@assinaja.com.br / admin123).
+     * - Cadastra automaticamente os signatários de teste requisitados:
+     *     1. John McClane   (john.mcclane@assinaja.com.br / 123)
+     *     2. Hans Gruber    (hans.gruber@assinaja.com.br / 123)
+     *     3. Holly Gennaro  (holly.gennaro@assinaja.com.br / 123)
+     * - Caso o banco SQLite local já exista em um celular ou emulador, este método
+     *   verifica individualmente por e-mail e só insere quem ainda não estiver cadastrado,
+     *   evitando exceções de chave única duplicada (SQLiteConstraintException).
+     */
     override suspend fun ensureDefaultAdminExists() = withContext(Dispatchers.IO) {
-        val adminCount = dao.countUsersByRole(UserRole.ADMIN)
-        if (adminCount == 0) {
+        val assinajaAdmin = dao.getUserByEmail("admin@assinaja.com.br")
+        val legacyAdmin = dao.getUserByEmail("admin@letssign.com.br")
+
+        if (assinajaAdmin == null && legacyAdmin == null) {
             dao.insertUser(
                 UserEntity(
-                    fullName = "Administrador Jurídico LetsSign",
-                    email = "admin@letssign.com.br",
-                    phone = "(11) 99999-0000",
+                    fullName = "Administrador AssinaJÁ",
+                    email = "admin@assinaja.com.br",
+                    phone = "(11) 98765-4321",
                     password = "admin123",
-                    legalDocument = "OAB/SP 400.123",
+                    legalDocument = "00.000.000/0001-91",
                     role = UserRole.ADMIN
                 )
             )
+        } else if (legacyAdmin != null && assinajaAdmin == null) {
+            dao.updateUser(
+                legacyAdmin.copy(
+                    fullName = "Administrador AssinaJÁ",
+                    email = "admin@assinaja.com.br",
+                    password = "admin123"
+                )
+            )
         }
+
+        // Signatários de homologação pré-cadastrados (Nakatomi Plaza / AssinaJÁ)
+        val defaultSigners = listOf(
+            UserEntity(
+                fullName = "John McClane",
+                email = "john.mcclane@assinaja.com.br",
+                phone = "(11) 99111-2233",
+                password = "123",
+                legalDocument = "111.222.333-44",
+                role = UserRole.SIGNATARIO
+            ),
+            UserEntity(
+                fullName = "Hans Gruber",
+                email = "hans.gruber@assinaja.com.br",
+                phone = "(11) 98888-7766",
+                password = "123",
+                legalDocument = "222.333.444-55",
+                role = UserRole.SIGNATARIO
+            ),
+            UserEntity(
+                fullName = "Holly Gennaro",
+                email = "holly.gennaro@assinaja.com.br",
+                phone = "(11) 97777-6655",
+                password = "123",
+                legalDocument = "333.444.555-66",
+                role = UserRole.SIGNATARIO
+            )
+        )
+
+        for (signer in defaultSigners) {
+            val existing = dao.getUserByEmail(signer.email)
+            if (existing == null) {
+                dao.insertUser(signer)
+            }
+        }
+
+        // Limpeza imediata de signatários removidos a pedido (Carlos Eduardo Mendes e Bruno Zamboni)
+        dao.purgeLegacyFields()
+        dao.purgeLegacyDocumentSigners()
+        dao.purgeLegacyUsers()
+        Unit
     }
 
     override suspend fun login(email: String, password: String): Result<UserEntity> =
@@ -104,7 +204,26 @@ class LocalLetsSignRepositoryImpl(
             if (cleanEmail.isBlank() || cleanPassword.isBlank()) {
                 return@withContext Result.failure(IllegalArgumentException("Preencha o e-mail e a senha para autenticar."))
             }
-            val user = dao.authenticate(cleanEmail, cleanPassword)
+
+            // Se for credencial de admin padrão, assegura sincronização imediata
+            if ((cleanEmail.equals("admin@assinaja.com.br", ignoreCase = true) ||
+                 cleanEmail.equals("admin@letssign.com.br", ignoreCase = true)) &&
+                cleanPassword == "admin123"
+            ) {
+                ensureDefaultAdminExists()
+            }
+
+            var user = dao.authenticate(cleanEmail, cleanPassword)
+
+            // Compatibilidade bidirecional entre admin novo e anterior
+            if (user == null && cleanPassword == "admin123") {
+                if (cleanEmail.equals("admin@assinaja.com.br", ignoreCase = true)) {
+                    user = dao.authenticate("admin@letssign.com.br", cleanPassword)
+                } else if (cleanEmail.equals("admin@letssign.com.br", ignoreCase = true)) {
+                    user = dao.authenticate("admin@assinaja.com.br", cleanPassword)
+                }
+            }
+
             if (user != null) {
                 Result.success(user)
             } else {
@@ -117,6 +236,9 @@ class LocalLetsSignRepositoryImpl(
 
     override fun observeAllUsers(): Flow<List<UserEntity>> =
         dao.observeAllUsers()
+
+    override fun observeAllAuditEvents(): Flow<List<AuditEventEntity>> =
+        dao.observeAllAuditEvents()
 
     override suspend fun saveSigner(
         editingId: Long?,
@@ -156,7 +278,7 @@ class LocalLetsSignRepositoryImpl(
         val existingByEmail = dao.getUserByEmail(cleanEmail)
         if (existingByEmail != null && existingByEmail.id != editingId) {
             return@withContext Result.failure(
-                IllegalArgumentException("Já existe um usuário/signatário cadastrado com o e-mail '$cleanEmail'.")
+                IllegalArgumentException("Já existe um signatário cadastrado com o e-mail '$cleanEmail'.")
             )
         }
 
@@ -185,6 +307,22 @@ class LocalLetsSignRepositoryImpl(
             dao.syncPendingSignerInfo(editingId, cleanName, cleanEmail, cleanPhone)
             dao.syncPendingFieldSignerName(editingId, cleanName)
             Result.success(updated)
+        }
+    }
+
+    override suspend fun deleteSigner(signerUserId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val user = dao.getUserById(signerUserId)
+                ?: return@withContext Result.failure(IllegalArgumentException("Signatário não encontrado."))
+            if (user.role == UserRole.ADMIN) {
+                return@withContext Result.failure(IllegalStateException("Não é permitido excluir um Administrador."))
+            }
+            dao.deleteSignatureFieldsBySignerUserId(signerUserId)
+            dao.deleteDocumentSignersBySignerUserId(signerUserId)
+            dao.deleteUserById(signerUserId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
@@ -253,7 +391,7 @@ class LocalLetsSignRepositoryImpl(
                 )
             }
 
-            // Verifica se cada signatário possui ao menos 1 campo posicionado e se todos os campos têm participante válido
+            // Verifica integridade dos campos
             val signerIds = signers.map { it.userId }.toSet()
             for (field in fields) {
                 if (field.signerUserId !in signerIds) {
@@ -286,7 +424,7 @@ class LocalLetsSignRepositoryImpl(
                 originalSha256 = originalSha256,
                 currentSha256 = originalSha256,
                 invitationMessage = invitationMessage.trim().ifBlank {
-                    "Solicitamos sua revisão e assinatura eletrônica neste instrumento jurídico via LetsSign."
+                    "Encaminhamos este documento para conferência e assinatura eletrônica/digital na plataforma AssinaJÁ."
                 },
                 status = DocumentStatus.ENVIADO,
                 version = version,
@@ -327,6 +465,7 @@ class LocalLetsSignRepositoryImpl(
                     yRatio = clamped.yRatio,
                     widthRatio = clamped.widthRatio,
                     heightRatio = clamped.heightRatio,
+                    fieldType = clamped.fieldType,
                     isSigned = false
                 )
             }
@@ -356,8 +495,8 @@ class LocalLetsSignRepositoryImpl(
                 AuditEventEntity(
                     documentId = docId,
                     eventType = AuditEventType.CAMPOS_POSICIONADOS,
-                    title = "${fields.size} Campo(s) Posicionado(s) no PDF",
-                    description = "Coordenadas relativas (0..1) salvas nas páginas ${fields.map { it.pageIndex + 1 }.distinct().sorted().joinToString(", ")}.",
+                    title = "${fields.size} Campo(s) Posicionado(s) no Documento",
+                    description = "Coordenadas relativas salvas nas páginas ${fields.map { it.pageIndex + 1 }.distinct().sorted().joinToString(", ")}.",
                     actorName = adminUser.fullName,
                     actorEmail = adminUser.email,
                     timestamp = now - 500L
@@ -366,7 +505,7 @@ class LocalLetsSignRepositoryImpl(
                     documentId = docId,
                     eventType = AuditEventType.DOCUMENTO_ENVIADO,
                     title = "Solicitações de Assinatura Disparadas",
-                    description = "Protocolo ${idempotencyKey.take(12)} • Convite enviado para todos os signatários.",
+                    description = "Protocolo ${idempotencyKey.take(12)} • Convites preparados para WhatsApp, SMS e E-mail.",
                     actorName = adminUser.fullName,
                     actorEmail = adminUser.email,
                     timestamp = now
@@ -390,17 +529,36 @@ class LocalLetsSignRepositoryImpl(
                 it.actorEmail.equals(signerUser.email, ignoreCase = true)
         }
         if (!alreadyLoggedView) {
+            val ip = PdfEngine.getLocalIpAddress()
             dao.insertAuditEvent(
                 AuditEventEntity(
                     documentId = documentId,
                     eventType = AuditEventType.DOCUMENTO_VISUALIZADO,
-                    title = "Documento Aberto para Revisão",
-                    description = "O signatário visualizou as páginas e campos de assinatura do PDF.",
+                    title = "Documento Aberto para Conferência",
+                    description = "Visualização das páginas e campos pelo signatário • IP: $ip",
                     actorName = signerUser.fullName,
                     actorEmail = signerUser.email
                 )
             )
         }
+    }
+
+    override suspend fun recordInviteShared(
+        documentId: Long,
+        channel: String,
+        actor: UserEntity
+    ): Unit = withContext(Dispatchers.IO) {
+        dao.insertAuditEvent(
+            AuditEventEntity(
+                documentId = documentId,
+                eventType = AuditEventType.LINK_COMPARTILHADO,
+                title = "Convite Compartilhado via $channel",
+                description = "Link de assinatura enviado com chave criptográfica pelo canal $channel.",
+                actorName = actor.fullName,
+                actorEmail = actor.email
+            )
+        )
+        Unit
     }
 
     override suspend fun signDocument(
@@ -433,7 +591,8 @@ class LocalLetsSignRepositoryImpl(
                 null
             }
 
-            val rawEvidence = "${details.document.id}|${details.document.originalSha256}|${signerUser.email}|$now|${signerRecord.signatureType.name}"
+            val ipAddress = PdfEngine.getLocalIpAddress()
+            val rawEvidence = "${details.document.id}|${details.document.originalSha256}|${signerUser.email}|$now|${signerRecord.signatureType.name}|$ipAddress"
             val sigHash = PdfEngine.calculateStringSha256(rawEvidence)
 
             val updatedSigner = signerRecord.copy(
@@ -443,18 +602,24 @@ class LocalLetsSignRepositoryImpl(
                 verificationToken = verificationToken?.takeIf { it.isNotBlank() },
                 certificateInfo = certificateInfo?.takeIf { it.isNotBlank() },
                 signatureHash = sigHash,
-                ipAddress = "189.40.112.${(10..250).random()} (App Nativo Android)"
+                ipAddress = ipAddress
             )
             dao.updateDocumentSigner(updatedSigner)
 
             val updatedFieldsForSigner = details.fields
                 .filter { it.signerUserId == signerUser.id }
                 .map { field ->
+                    val summary = when (field.fieldType) {
+                        br.com.fiap.letssign.domain.model.FieldType.CPF -> signerUser.legalDocument.ifBlank { "CPF: ${signerRecord.signerPhone}" }
+                        br.com.fiap.letssign.domain.model.FieldType.DATA -> "Data: ${PdfEngine.formatTimestamp(now)}"
+                        br.com.fiap.letssign.domain.model.FieldType.ASSINATURA,
+                        br.com.fiap.letssign.domain.model.FieldType.RUBRICA -> sigHash
+                    }
                     field.copy(
                         isSigned = true,
                         signedAt = now,
-                        signatureImagePath = savedSignaturePath,
-                        stampSummary = sigHash
+                        signatureImagePath = if (field.fieldType == br.com.fiap.letssign.domain.model.FieldType.ASSINATURA || field.fieldType == br.com.fiap.letssign.domain.model.FieldType.RUBRICA) savedSignaturePath else null,
+                        stampSummary = summary
                     )
                 }
             dao.updateSignatureFields(updatedFieldsForSigner)
@@ -462,15 +627,14 @@ class LocalLetsSignRepositoryImpl(
             val signatureAuditEvent = AuditEventEntity(
                 documentId = documentId,
                 eventType = AuditEventType.ASSINATURA_REALIZADA,
-                title = "Assinatura Realizada (${signerRecord.classification.label})",
-                description = "Modalidade: ${signerRecord.signatureType.fullName} • Hash: ${sigHash.take(16)}...",
+                title = "Assinatura Efetuada (${signerRecord.classification.label})",
+                description = "Modalidade: ${signerRecord.signatureType.fullName} • IP: $ipAddress • Hash: ${sigHash.take(16)}...",
                 actorName = signerUser.fullName,
                 actorEmail = signerUser.email,
                 timestamp = now
             )
             dao.insertAuditEvent(signatureAuditEvent)
 
-            // Recarrega lista completa de signatários e campos para verificar se todos os obrigatórios assinaram
             val allUpdatedSigners = details.signers.map {
                 if (it.id == updatedSigner.id) updatedSigner else it
             }
@@ -494,10 +658,10 @@ class LocalLetsSignRepositoryImpl(
                     AuditEventEntity(
                         documentId = documentId,
                         eventType = AuditEventType.DOCUMENTO_CONCLUIDO,
-                        title = "Documento Concluído e Selado",
-                        description = "Todos os signatários obrigatórios finalizaram suas assinaturas. Manifesto Jurídico anexado ao PDF final.",
-                        actorName = "Motor de Certificação LetsSign",
-                        actorEmail = "certificador@letssign.com.br",
+                        title = "Documento 100% Concluído e Selado",
+                        description = "Todos os signatários finalizaram suas assinaturas. Manifesto e rodapés AssinaJÁ anexados.",
+                        actorName = "Motor de Autenticação AssinaJÁ",
+                        actorEmail = "sistema@assinaja.com.br",
                         timestamp = now + 200L
                     )
                 } else null
@@ -507,7 +671,7 @@ class LocalLetsSignRepositoryImpl(
                 dao.insertAuditEvent(allEvents.last())
             }
 
-            // Gera o PDF atualizado no sistema de arquivos com as assinaturas estampadas (e Manifesto se concluído)
+            // Gera o PDF atualizado com a estampa oficial AssinaJÁ no rodapé e selos de assinatura
             val (newPdfPath, newPdfSha256) = PdfEngine.generateUpdatedSignedPdf(
                 context = context,
                 document = details.document,
@@ -522,6 +686,54 @@ class LocalLetsSignRepositoryImpl(
                 currentSha256 = newPdfSha256,
                 status = newDocStatus,
                 completedAt = if (allMandatoryCompleted) now + 200L else null
+            )
+            dao.updateDocument(updatedDoc)
+
+            val finalDetails = dao.getDocumentDetails(documentId)!!
+            Result.success(finalDetails)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun rejectDocument(
+        documentId: Long,
+        signerUser: UserEntity,
+        reason: String
+    ): Result<DocumentFullDetails> = withContext(Dispatchers.IO) {
+        try {
+            val details = dao.getDocumentDetails(documentId)
+                ?: return@withContext Result.failure(IllegalArgumentException("Documento não encontrado."))
+
+            val signerRecord = details.signers.find { it.signerUserId == signerUser.id }
+                ?: return@withContext Result.failure(
+                    IllegalAccessException("Você não está autorizado como signatário deste documento.")
+                )
+
+            val now = System.currentTimeMillis()
+            val ip = PdfEngine.getLocalIpAddress()
+            val cleanReason = reason.trim().ifBlank { "Signatário optou por não assinar o documento." }
+
+            val updatedSigner = signerRecord.copy(
+                status = SignerStatus.REJEITADO,
+                signedAt = now,
+                ipAddress = ip
+            )
+            dao.updateDocumentSigner(updatedSigner)
+
+            val rejectEvent = AuditEventEntity(
+                documentId = documentId,
+                eventType = AuditEventType.DOCUMENTO_REJEITADO,
+                title = "Documento Rejeitado pelo Signatário",
+                description = "Motivo: \"$cleanReason\" • IP: $ip",
+                actorName = signerUser.fullName,
+                actorEmail = signerUser.email,
+                timestamp = now
+            )
+            dao.insertAuditEvent(rejectEvent)
+
+            val updatedDoc = details.document.copy(
+                status = DocumentStatus.REJEITADO
             )
             dao.updateDocument(updatedDoc)
 

@@ -5,34 +5,52 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val NavyPrimary = Color(0xFF0F2043)
-val NavySecondary = Color(0xFF1E3A6D)
-val TealAccent = Color(0xFF00796B)
-val GoldLegal = Color(0xFFB45309)
-val IcpBlue = Color(0xFF1565C0)
-val SurfaceBackground = Color(0xFFF5F7FB)
-val CardWhite = Color(0xFFFFFFFF)
-val SuccessGreen = Color(0xFF1B8755)
-val WarningAmber = Color(0xFFD97706)
-val ErrorRed = Color(0xFFC62828)
+// Paleta Oficial AssinaJÁ — Vinho Luxuoso, Ouro Champagne e Marfim Puro
+val WinePrimary = Color(0xFF6B1724)        // Vinho Nobre Imperial
+val WineDark = Color(0xFF4A0E17)           // Borgonha Profundo (Cabeçalhos / Contrastes)
+val WineLight = Color(0xFFFBF0F2)          // Rosé Suave para containers e chips
+val WineBorder = Color(0xFFE8C5CC)         // Borda delicada em tom vinho claro
+
+val GoldChampagne = Color(0xFFC5A059)      // Ouro Champagne Nobre (Acentos, Selos)
+val GoldLight = Color(0xFFF9F5EC)          // Fundo de destaque dourado
+val GoldBorder = Color(0xFFE5D2A8)         // Borda dourada refinada
+
+val CharcoalText = Color(0xFF1E2024)       // Grafite Escuro para títulos e textos
+val MutedText = Color(0xFF5E6573)          // Cinza Médio balanceado
+val IvoryBackground = Color(0xFFFBF9F7)    // Fundo Marfim Nobre (Clean e Sério)
+val CardWhite = Color(0xFFFFFFFF)          // Branco Puro para cartões
+val CardBorder = Color(0xFFE9E4DF)         // Borda de cartão neutra sofisticada
+
+val SuccessGreen = Color(0xFF1B8755)       // Verde Sucesso Institucional
+val WarningAmber = Color(0xFFC07000)       // Âmbar para pendências
+val ErrorRed = Color(0xFFB3261E)           // Vermelho alerta
+val InfoBlue = Color(0xFF1868B7)           // Azul para links e informativos
+
+// Compatibilidade com tokens existentes
+val NavyPrimary = WinePrimary
+val NavySecondary = WineDark
+val TealAccent = GoldChampagne
+val GoldLegal = GoldChampagne
+val IcpBlue = WinePrimary
+val SurfaceBackground = IvoryBackground
 
 private val LightColors = lightColorScheme(
-    primary = NavyPrimary,
+    primary = WinePrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE6FA),
-    onPrimaryContainer = NavyPrimary,
-    secondary = TealAccent,
+    primaryContainer = WineLight,
+    onPrimaryContainer = WineDark,
+    secondary = GoldChampagne,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD5F5EE),
-    onSecondaryContainer = Color(0xFF004D40),
-    tertiary = GoldLegal,
+    secondaryContainer = GoldLight,
+    onSecondaryContainer = Color(0xFF5A4418),
+    tertiary = GoldChampagne,
     onTertiary = Color.White,
-    background = SurfaceBackground,
-    onBackground = Color(0xFF1A2130),
+    background = IvoryBackground,
+    onBackground = CharcoalText,
     surface = CardWhite,
-    onSurface = Color(0xFF1A2130),
-    surfaceVariant = Color(0xFFEEF2F9),
-    onSurfaceVariant = Color(0xFF4A5568),
+    onSurface = CharcoalText,
+    surfaceVariant = Color(0xFFF4EFEA),
+    onSurfaceVariant = MutedText,
     error = ErrorRed,
     onError = Color.White
 )

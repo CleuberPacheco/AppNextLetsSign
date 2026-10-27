@@ -1,10 +1,13 @@
 package br.com.fiap.letssign
 
+import br.com.fiap.letssign.domain.model.DocumentStatus
 import br.com.fiap.letssign.domain.model.DraftSignatureField
 import br.com.fiap.letssign.domain.model.SignatureType
 import br.com.fiap.letssign.domain.model.SignerClassification
+import br.com.fiap.letssign.domain.model.SignerStatus
 import br.com.fiap.letssign.util.PdfEngine
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,7 +18,7 @@ class DomainRulesTest {
         val outOfBoundsField = DraftSignatureField(
             id = "f1",
             signerUserId = 10L,
-            signerName = "Dr. Marcos Silva",
+            signerName = "Carlos Mendes",
             classification = SignerClassification.CONTRATANTE,
             signatureType = SignatureType.QUALIFICADA_ICP,
             pageIndex = 0,
@@ -35,9 +38,23 @@ class DomainRulesTest {
 
     @Test
     fun `sha256 calculation produces deterministic 64 char hex string`() {
-        val hash1 = PdfEngine.calculateStringSha256("Contrato LetsSign FIAP")
-        val hash2 = PdfEngine.calculateStringSha256("Contrato LetsSign FIAP")
+        val hash1 = PdfEngine.calculateStringSha256("Contrato AssinaJA FIAP")
+        val hash2 = PdfEngine.calculateStringSha256("Contrato AssinaJA FIAP")
         assertEquals(64, hash1.length)
         assertEquals(hash1, hash2)
+    }
+
+    @Test
+    fun `document and signer status enum values support rejection`() {
+        assertEquals("Rejeitado", DocumentStatus.REJEITADO.label)
+        assertEquals("Rejeitado", SignerStatus.REJEITADO.label)
+        assertEquals("Concluído", DocumentStatus.CONCLUIDO.label)
+    }
+
+    @Test
+    fun `local ip address fallback provides valid non empty string`() {
+        val ip = PdfEngine.getLocalIpAddress()
+        assertNotNull(ip)
+        assertTrue(ip.isNotBlank())
     }
 }

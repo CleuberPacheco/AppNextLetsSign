@@ -12,10 +12,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -26,27 +27,36 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +82,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -80,46 +93,234 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import br.com.fiap.letssign.data.local.UserEntity
 import br.com.fiap.letssign.domain.model.DocumentStatus
 import br.com.fiap.letssign.domain.model.DraftSignatureField
+import br.com.fiap.letssign.domain.model.FieldType
 import br.com.fiap.letssign.domain.model.SignatureType
 import br.com.fiap.letssign.domain.model.SignerClassification
+import br.com.fiap.letssign.ui.theme.CardBorder
+import br.com.fiap.letssign.ui.theme.CardWhite
+import br.com.fiap.letssign.ui.theme.CharcoalText
 import br.com.fiap.letssign.ui.theme.ErrorRed
-import br.com.fiap.letssign.ui.theme.GoldLegal
-import br.com.fiap.letssign.ui.theme.IcpBlue
-import br.com.fiap.letssign.ui.theme.NavyPrimary
+import br.com.fiap.letssign.ui.theme.GoldChampagne
+import br.com.fiap.letssign.ui.theme.GoldLight
+import br.com.fiap.letssign.ui.theme.MutedText
 import br.com.fiap.letssign.ui.theme.SuccessGreen
-import br.com.fiap.letssign.ui.theme.TealAccent
 import br.com.fiap.letssign.ui.theme.WarningAmber
+import br.com.fiap.letssign.ui.theme.WineDark
+import br.com.fiap.letssign.ui.theme.WineLight
+import br.com.fiap.letssign.ui.theme.WinePrimary
 import br.com.fiap.letssign.util.PdfEngine
 import br.com.fiap.letssign.util.PdfPageBitmap
 import kotlin.math.roundToInt
 
+/**
+ * Logotipo oficial AssinaJÁ com o desenho da pena clássica de caligrafia
+ * estilizada em tons de Vermelho Vinho Nobre e Ouro Champagne.
+ */
+@Composable
+fun AssinaJaLogo(
+    modifier: Modifier = Modifier,
+    size: Dp = 38.dp,
+    showText: Boolean = true,
+    isLightOnDark: Boolean = false
+) {
+    val featherWineColor = if (isLightOnDark) Color.White else WinePrimary
+    val nibGoldColor = GoldChampagne
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+    ) {
+        Canvas(modifier = Modifier.size(size)) {
+            val w = this.size.width
+            val h = this.size.height
+
+            val featherPath = Path().apply {
+                moveTo(w * 0.78f, h * 0.08f)
+                cubicTo(
+                    w * 0.95f, h * 0.28f,
+                    w * 0.85f, h * 0.62f,
+                    w * 0.38f, h * 0.76f
+                )
+                lineTo(w * 0.34f, h * 0.78f)
+                cubicTo(
+                    w * 0.48f, h * 0.58f,
+                    w * 0.44f, h * 0.34f,
+                    w * 0.78f, h * 0.08f
+                )
+                close()
+            }
+            drawPath(path = featherPath, color = featherWineColor.copy(alpha = 0.92f))
+
+            val stemPath = Path().apply {
+                moveTo(w * 0.78f, h * 0.08f)
+                cubicTo(
+                    w * 0.58f, h * 0.38f,
+                    w * 0.42f, h * 0.65f,
+                    w * 0.26f, h * 0.84f
+                )
+            }
+            drawPath(
+                path = stemPath,
+                color = nibGoldColor,
+                style = Stroke(width = w * 0.055f, cap = StrokeCap.Round)
+            )
+
+            val nibPath = Path().apply {
+                moveTo(w * 0.28f, h * 0.81f)
+                lineTo(w * 0.16f, h * 0.95f)
+                lineTo(w * 0.22f, h * 0.87f)
+                lineTo(w * 0.34f, h * 0.75f)
+                close()
+            }
+            drawPath(path = nibPath, color = nibGoldColor)
+
+            drawCircle(
+                color = featherWineColor,
+                radius = w * 0.045f,
+                center = Offset(w * 0.14f, h * 0.96f)
+            )
+        }
+
+        if (showText) {
+            Spacer(modifier = Modifier.width(9.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Assina",
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 21.sp,
+                    color = if (isLightOnDark) Color.White else WinePrimary,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "JÁ",
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 21.sp,
+                    color = GoldChampagne,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Card Executivo de Métrica para a Dashboard do AssinaJÁ.
+ */
+@Composable
+fun AssinaJaMetricCard(
+    title: String,
+    count: Int,
+    icon: ImageVector,
+    accentColor: Color,
+    bgColor: Color,
+    subText: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, CardBorder),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Surface(
+                    color = bgColor,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Surface(
+                    color = bgColor,
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(0.8.dp, accentColor.copy(alpha = 0.3f))
+                ) {
+                    Text(
+                        text = "$count",
+                        color = accentColor,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = CharcoalText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = subText,
+                fontSize = 11.sp,
+                color = MutedText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 @Composable
 fun DocumentStatusBadge(status: DocumentStatus) {
     val (bgColor, textColor) = when (status) {
-        DocumentStatus.CONCLUIDO -> Color(0xFFDFF6E8) to SuccessGreen
-        DocumentStatus.PARCIALMENTE_ASSINADO -> Color(0xFFFFF3CD) to WarningAmber
-        DocumentStatus.ENVIADO -> Color(0xFFE0ECFF) to IcpBlue
-        DocumentStatus.RASCUNHO -> Color(0xFFEAECEF) to Color(0xFF495057)
+        DocumentStatus.CONCLUIDO -> Color(0xFFE8F7EE) to SuccessGreen
+        DocumentStatus.PARCIALMENTE_ASSINADO -> Color(0xFFFFF7E6) to WarningAmber
+        DocumentStatus.ENVIADO -> WineLight to WinePrimary
+        DocumentStatus.REJEITADO -> Color(0xFFFFEBEE) to ErrorRed
+        DocumentStatus.RASCUNHO -> Color(0xFFF0EDE9) to Color(0xFF6B6661)
     }
     Surface(
         color = bgColor,
         shape = RoundedCornerShape(50),
-        border = BorderStroke(1.dp, textColor.copy(alpha = 0.35f))
+        border = BorderStroke(0.8.dp, textColor.copy(alpha = 0.35f))
     ) {
         Text(
             text = status.label,
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
         )
     }
 }
@@ -127,18 +328,19 @@ fun DocumentStatusBadge(status: DocumentStatus) {
 @Composable
 fun SignerClassificationBadge(classification: SignerClassification) {
     val (bg, fg) = when (classification) {
-        SignerClassification.CONTRATANTE -> Color(0xFFE3F2FD) to Color(0xFF0D47A1)
-        SignerClassification.CONTRATADO -> Color(0xFFE0F2F1) to Color(0xFF004D40)
-        SignerClassification.TESTEMUNHA -> Color(0xFFFFF8E1) to GoldLegal
+        SignerClassification.CONTRATANTE -> WineLight to WinePrimary
+        SignerClassification.CONTRATADO -> Color(0xFFEAF5EC) to SuccessGreen
+        SignerClassification.TESTEMUNHA -> GoldLight to Color(0xFF7A5816)
     }
     Surface(
         color = bg,
-        shape = RoundedCornerShape(6.dp)
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(0.6.dp, fg.copy(alpha = 0.25f))
     ) {
         Text(
             text = classification.label.uppercase(),
             color = fg,
-            fontSize = 10.sp,
+            fontSize = 9.5.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
@@ -148,14 +350,14 @@ fun SignerClassificationBadge(classification: SignerClassification) {
 @Composable
 fun SignatureTypeBadge(signatureType: SignatureType) {
     val (bg, fg) = when (signatureType) {
-        SignatureType.QUALIFICADA_ICP -> Color(0xFFE8F0FE) to IcpBlue
-        SignatureType.AVANCADA -> Color(0xFFE0F2F1) to TealAccent
-        SignatureType.SIMPLES -> Color(0xFFECEFF1) to Color(0xFF37474F)
+        SignatureType.QUALIFICADA_ICP -> WineLight to WinePrimary
+        SignatureType.AVANCADA -> GoldLight to Color(0xFF7A5816)
+        SignatureType.SIMPLES -> Color(0xFFF1F0ED) to Color(0xFF4A4E57)
     }
     Surface(
         color = bg,
         shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(0.8.dp, fg.copy(alpha = 0.4f))
+        border = BorderStroke(0.7.dp, fg.copy(alpha = 0.35f))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -165,13 +367,13 @@ fun SignatureTypeBadge(signatureType: SignatureType) {
                 imageVector = Icons.Default.VerifiedUser,
                 contentDescription = null,
                 tint = fg,
-                modifier = Modifier.size(12.dp)
+                modifier = Modifier.size(11.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = signatureType.shortName,
                 color = fg,
-                fontSize = 10.sp,
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -179,7 +381,7 @@ fun SignatureTypeBadge(signatureType: SignatureType) {
 }
 
 /**
- * Modal de Cadastro e Edição de Signatário pelo Admin (Item 2 das Funcionalidades Obrigatórias).
+ * Modal de Cadastro e Edição de Signatário Corporativo pelo Admin.
  */
 @Composable
 fun SignerFormDialog(
@@ -206,10 +408,15 @@ fun SignerFormDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = if (initialSigner == null) "Cadastrar Novo Signatário" else "Editar Signatário",
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AssinaJaLogo(size = 24.dp, showText = false)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (initialSigner == null) "Cadastrar Signatário" else "Editar Signatário",
+                    fontWeight = FontWeight.Bold,
+                    color = WinePrimary
+                )
+            }
         },
         text = {
             Column(
@@ -217,9 +424,9 @@ fun SignerFormDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "O e-mail e a senha cadastrados serão as credenciais de login para este signatário assinar os documentos no app.",
+                    text = "O e-mail e a senha cadastrados serão as credenciais de autenticação que o signatário usará para assinar pelo aplicativo.",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MutedText
                 )
 
                 if (errorMessage != null) {
@@ -244,7 +451,7 @@ fun SignerFormDialog(
                         errorMessage = null
                     },
                     label = { Text("Nome completo *") },
-                    placeholder = { Text("Ex: Dra. Carolina Mendes") },
+                    placeholder = { Text("Ex: John McClane") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -256,7 +463,7 @@ fun SignerFormDialog(
                         errorMessage = null
                     },
                     label = { Text("E-mail (credencial de login) *") },
-                    placeholder = { Text("Ex: carolina@escritorio.adv.br") },
+                    placeholder = { Text("Ex: john.mcclane@assinaja.com.br") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -269,7 +476,7 @@ fun SignerFormDialog(
                         errorMessage = null
                     },
                     label = { Text("Telefone / WhatsApp *") },
-                    placeholder = { Text("Ex: (11) 98877-6655") },
+                    placeholder = { Text("Ex: (11) 98765-4321") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -281,7 +488,7 @@ fun SignerFormDialog(
                         password = it
                         errorMessage = null
                     },
-                    label = { Text("Senha (credencial de login) *") },
+                    label = { Text("Senha de autenticação *") },
                     placeholder = { Text("Mínimo 4 caracteres") },
                     singleLine = true,
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -289,7 +496,8 @@ fun SignerFormDialog(
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Alternar visibilidade da senha"
+                                contentDescription = "Alternar visibilidade",
+                                tint = WinePrimary
                             )
                         }
                     },
@@ -299,8 +507,8 @@ fun SignerFormDialog(
                 OutlinedTextField(
                     value = legalDocument,
                     onValueChange = { legalDocument = it },
-                    label = { Text("CPF ou Registro OAB (Opcional)") },
-                    placeholder = { Text("Ex: CPF 123.456.789-00 ou OAB/SP 123.456") },
+                    label = { Text("CPF, CNPJ ou Documento (Opcional)") },
+                    placeholder = { Text("Ex: 123.456.789-00") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -319,23 +527,221 @@ fun SignerFormDialog(
                     ) { err ->
                         errorMessage = err
                     }
-                }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = WinePrimary)
             ) {
                 Text(if (initialSigner == null) "Cadastrar" else "Salvar Alterações")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancelar", color = WinePrimary)
             }
         }
     )
 }
 
 /**
+ * Visualizador em Tela Cheia com Zoom Interativo (Pinch-to-zoom e Pan)
+ * para leitura clara de cada cláusula do documento antes da assinatura.
+ */
+@Composable
+fun FullscreenPdfViewerDialog(
+    pdfFilePath: String,
+    initialPageIndex: Int = 0,
+    totalPages: Int,
+    documentTitle: String,
+    onDismiss: () -> Unit
+) {
+    var currentPage by remember { mutableIntStateOf(initialPageIndex.coerceIn(0, (totalPages - 1).coerceAtLeast(0))) }
+    var pageRender by remember(pdfFilePath, currentPage) { mutableStateOf<PdfPageBitmap?>(null) }
+    var isLoading by remember(pdfFilePath, currentPage) { mutableStateOf(true) }
+
+    var scale by remember(currentPage) { mutableFloatStateOf(1f) }
+    var offset by remember(currentPage) { mutableStateOf(Offset.Zero) }
+
+    LaunchedEffect(pdfFilePath, currentPage) {
+        isLoading = true
+        pageRender = PdfEngine.renderPdfPage(pdfFilePath, currentPage, targetWidthPx = 1800)
+        isLoading = false
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            color = Color(0xFF16171A),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Barra de Ferramentas Superior
+                Surface(
+                    color = WineDark,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            IconButton(onClick = onDismiss) {
+                                Icon(Icons.Default.Close, contentDescription = "Fechar", tint = Color.White)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = documentTitle,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "Pág. ${currentPage + 1} de $totalPages • Zoom: ${(scale * 100).toInt()}%",
+                                    fontSize = 11.sp,
+                                    color = GoldChampagne
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    scale = (scale - 0.25f).coerceAtLeast(1f)
+                                    if (scale == 1f) offset = Offset.Zero
+                                }
+                            ) {
+                                Icon(Icons.Default.ZoomOut, contentDescription = "Menos Zoom", tint = Color.White)
+                            }
+                            IconButton(
+                                onClick = {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                }
+                            ) {
+                                Icon(Icons.Default.RestartAlt, contentDescription = "Resetar Zoom", tint = GoldChampagne)
+                            }
+                            IconButton(
+                                onClick = {
+                                    scale = (scale + 0.35f).coerceAtMost(4f)
+                                }
+                            ) {
+                                Icon(Icons.Default.ZoomIn, contentDescription = "Mais Zoom", tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                // Área do PDF com Gestos de Pinça e Pan
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .pointerInput(currentPage) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 4.5f)
+                                if (scale > 1f) {
+                                    offset += pan
+                                } else {
+                                    offset = Offset.Zero
+                                }
+                            }
+                        }
+                ) {
+                    if (isLoading) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = GoldChampagne)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Carregando página em alta resolução...", color = Color.White, fontSize = 12.sp)
+                        }
+                    } else if (pageRender != null) {
+                        Image(
+                            bitmap = pageRender!!.bitmap.asImageBitmap(),
+                            contentDescription = "Página ${currentPage + 1}",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                )
+                        )
+                    } else {
+                        Text("Não foi possível carregar o documento em tela cheia.", color = ErrorRed)
+                    }
+                }
+
+                // Barra de Navegação de Páginas Inferior
+                Surface(
+                    color = Color(0xFF202227),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Button(
+                            enabled = currentPage > 0,
+                            onClick = {
+                                currentPage--
+                                scale = 1f
+                                offset = Offset.Zero
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = WinePrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pág. Anterior", fontSize = 12.sp)
+                        }
+
+                        Text(
+                            text = "${currentPage + 1} / $totalPages",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+
+                        Button(
+                            enabled = currentPage < totalPages - 1,
+                            onClick = {
+                                currentPage++
+                                scale = 1f
+                                offset = Offset.Zero
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = WinePrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Próxima Pág.", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Visualizador de Página do PDF com suporte a Posicionamento Interativo (Drag & Drop)
- * preservando coordenadas relativas normalizadas (0.0f a 1.0f) em relação à página do PDF,
- * e garantindo que os campos permaneçam sempre dentro dos limites da página.
+ * de Rubricas, CPFs e Datas.
  */
 @Composable
 fun PdfPageInteractiveCanvas(
@@ -346,6 +752,7 @@ fun PdfPageInteractiveCanvas(
     highlightedSignerUserId: Long? = null,
     signedFieldIds: Set<String> = emptySet(),
     onFieldMoved: (fieldId: String, newXRatio: Float, newYRatio: Float) -> Unit = { _, _, _ -> },
+    onFieldResized: (fieldId: String, newWidthRatio: Float, newHeightRatio: Float) -> Unit = { _, _, _ -> },
     onFieldRemoved: (fieldId: String) -> Unit = {},
     onFieldClicked: (DraftSignatureField) -> Unit = {}
 ) {
@@ -364,15 +771,15 @@ fun PdfPageInteractiveCanvas(
         if (pr != null && pr.pdfPageHeight > 0) {
             (pr.pdfPageWidth.toFloat() / pr.pdfPageHeight.toFloat()).coerceIn(0.45f, 1.8f)
         } else {
-            595f / 842f // Proporção A4 padrão
+            595f / 842f
         }
     }
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color(0xFFCFD8E6)),
+        border = BorderStroke(1.dp, CardBorder),
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(aspectRatio)
@@ -389,23 +796,22 @@ fun PdfPageInteractiveCanvas(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    CircularProgressIndicator(color = NavyPrimary)
+                    CircularProgressIndicator(color = WinePrimary)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Renderizando página ${pageIndex + 1} do PDF...",
+                        text = "Renderizando página ${pageIndex + 1}...",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MutedText
                     )
                 }
             } else if (pageRender != null) {
                 Image(
                     bitmap = pageRender!!.bitmap.asImageBitmap(),
-                    contentDescription = "Página ${pageIndex + 1} do PDF",
+                    contentDescription = "Página ${pageIndex + 1} do Documento",
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Renderiza os campos de assinatura posicionados sobre esta página usando coordenadas relativas
                 if (containerSize.width > 0 && containerSize.height > 0) {
                     val containerW = containerSize.width.toFloat()
                     val containerH = containerSize.height.toFloat()
@@ -421,6 +827,7 @@ fun PdfPageInteractiveCanvas(
                             isHighlightedForSigning = highlightedSignerUserId == field.signerUserId,
                             isAlreadySigned = field.id in signedFieldIds,
                             onFieldMoved = onFieldMoved,
+                            onFieldResized = onFieldResized,
                             onFieldRemoved = onFieldRemoved,
                             onFieldClicked = onFieldClicked
                         )
@@ -432,7 +839,7 @@ fun PdfPageInteractiveCanvas(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Text(
-                        text = "Não foi possível renderizar esta página do PDF.",
+                        text = "Não foi possível carregar o preview da página.",
                         color = ErrorRed,
                         fontSize = 13.sp
                     )
@@ -452,35 +859,41 @@ private fun DraggableSignatureFieldOverlay(
     isHighlightedForSigning: Boolean,
     isAlreadySigned: Boolean,
     onFieldMoved: (fieldId: String, newXRatio: Float, newYRatio: Float) -> Unit,
+    onFieldResized: (fieldId: String, newWidthRatio: Float, newHeightRatio: Float) -> Unit,
     onFieldRemoved: (fieldId: String) -> Unit,
     onFieldClicked: (DraftSignatureField) -> Unit
 ) {
-    // Mantém estado local fluido durante o arraste (drag) e sincroniza com o estado externo
     var localXRatio by remember(field.id, field.xRatio) { mutableFloatStateOf(field.xRatio) }
     var localYRatio by remember(field.id, field.yRatio) { mutableFloatStateOf(field.yRatio) }
+    var localWidthRatio by remember(field.id, field.widthRatio) { mutableFloatStateOf(field.widthRatio) }
+    var localHeightRatio by remember(field.id, field.heightRatio) { mutableFloatStateOf(field.heightRatio) }
 
     val currentOnMoved by rememberUpdatedState(onFieldMoved)
-    val maxXRatio = (1f - field.widthRatio).coerceAtLeast(0f)
-    val maxYRatio = (1f - field.heightRatio).coerceAtLeast(0f)
+    val currentOnResized by rememberUpdatedState(onFieldResized)
+    val maxXRatio = (1f - localWidthRatio).coerceAtLeast(0f)
+    val maxYRatio = (1f - localHeightRatio).coerceAtLeast(0f)
 
-    val widthDp = with(density) { (field.widthRatio * containerWidthPx).toDp() }
-    val heightDp = with(density) { (field.heightRatio * containerHeightPx).toDp() }
+    val widthDp = with(density) { (localWidthRatio * containerWidthPx).toDp() }
+    val heightDp = with(density) { (localHeightRatio * containerHeightPx).toDp() }
     val offsetX = (localXRatio * containerWidthPx).roundToInt()
     val offsetY = (localYRatio * containerHeightPx).roundToInt()
 
-    val accentColor = when {
-        isAlreadySigned -> SuccessGreen
-        isHighlightedForSigning -> TealAccent
-        field.signatureType == SignatureType.QUALIFICADA_ICP -> IcpBlue
-        field.signatureType == SignatureType.AVANCADA -> TealAccent
-        else -> NavyPrimary
+    val fieldColor = when (field.fieldType) {
+        FieldType.ASSINATURA -> WinePrimary
+        FieldType.RUBRICA -> WineDark
+        FieldType.CPF -> Color(0xFF006699)
+        FieldType.DATA -> Color(0xFF7A5816)
     }
 
-    val bgColor = when {
-        isAlreadySigned -> Color(0xFFE8F8EE).copy(alpha = 0.92f)
-        isHighlightedForSigning -> Color(0xFFE0F7FA).copy(alpha = 0.94f)
-        else -> Color(0xFFEEF4FF).copy(alpha = 0.92f)
+    val fieldIcon = when (field.fieldType) {
+        FieldType.ASSINATURA -> if (isAlreadySigned) Icons.Default.CheckCircle else Icons.Default.Draw
+        FieldType.RUBRICA -> if (isAlreadySigned) Icons.Default.CheckCircle else Icons.Default.Draw
+        FieldType.CPF -> Icons.Default.Badge
+        FieldType.DATA -> Icons.Default.CalendarToday
     }
+
+    val accentColor = if (isAlreadySigned) SuccessGreen else fieldColor
+    val bgColor = if (isAlreadySigned) Color(0xFFE8F8EE).copy(alpha = 0.94f) else WineLight.copy(alpha = 0.95f)
 
     Box(
         modifier = Modifier
@@ -490,8 +903,8 @@ private fun DraggableSignatureFieldOverlay(
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
             .border(
-                width = if (isHighlightedForSigning) 2.dp else 1.5.dp,
-                color = accentColor,
+                width = if (isHighlightedForSigning) 2.dp else 1.4.dp,
+                color = if (isHighlightedForSigning) GoldChampagne else accentColor,
                 shape = RoundedCornerShape(8.dp)
             )
             .then(
@@ -526,18 +939,14 @@ private fun DraggableSignatureFieldOverlay(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        imageVector = when {
-                            isAlreadySigned -> Icons.Default.CheckCircle
-                            isEditable -> Icons.Default.OpenWith
-                            else -> Icons.Default.Draw
-                        },
+                        imageVector = fieldIcon,
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(3.dp))
                     Text(
-                        text = field.classification.label.uppercase(),
+                        text = "${field.fieldType.shortLabel.uppercase()} • ${field.classification.label.uppercase()}",
                         color = accentColor,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -567,7 +976,7 @@ private fun DraggableSignatureFieldOverlay(
 
             Text(
                 text = field.signerName,
-                color = Color(0xFF1A2130),
+                color = CharcoalText,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -580,34 +989,62 @@ private fun DraggableSignatureFieldOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = field.signatureType.shortName,
+                    text = field.fieldType.label,
                     color = accentColor,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                Text(
-                    text = if (isEditable) {
-                        "X:${(localXRatio * 100).roundToInt()}% Y:${(localYRatio * 100).roundToInt()}%"
-                    } else if (isAlreadySigned) {
-                        "ASSINADO"
-                    } else if (isHighlightedForSigning) {
-                        "TOQUE P/ ASSINAR"
-                    } else {
-                        "AGUARDANDO"
-                    },
-                    color = if (isHighlightedForSigning) TealAccent else Color(0xFF5A6577),
-                    fontSize = 7.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold
-                )
+
+                if (isEditable) {
+                    // Pega de redimensionamento elegante no canto inferior direito
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(GoldChampagne.copy(alpha = 0.35f))
+                            .pointerInput(field.id, containerWidthPx, containerHeightPx) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    val deltaW = dragAmount.x / containerWidthPx
+                                    val deltaH = dragAmount.y / containerHeightPx
+                                    localWidthRatio = (localWidthRatio + deltaW).coerceIn(0.18f, (1f - localXRatio).coerceAtLeast(0.18f))
+                                    localHeightRatio = (localHeightRatio + deltaH).coerceIn(0.05f, (1f - localYRatio).coerceAtLeast(0.05f))
+                                    currentOnResized(field.id, localWidthRatio, localHeightRatio)
+                                }
+                            }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenWith,
+                            contentDescription = "Arrastar para redimensionar",
+                            tint = WinePrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = if (isAlreadySigned) {
+                            "PREENCHIDO"
+                        } else if (isHighlightedForSigning) {
+                            "TOQUE P/ ASSINAR"
+                        } else {
+                            "AGUARDANDO"
+                        },
+                        color = if (isHighlightedForSigning) WinePrimary else MutedText,
+                        fontSize = 7.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * Quadro de Canvas interativo para coleta de Rubrica / Assinatura Manuscrita na tela do celular.
+ * Quadro de Canvas para coleta de Rubrica com botão Limpar alinhado e sem quebras verticais.
  */
 @Composable
 fun HandwrittenSignatureCanvasPad(
@@ -628,7 +1065,7 @@ fun HandwrittenSignatureCanvasPad(
         val androidCanvas = AndroidCanvas(bmp)
 
         val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.rgb(15, 32, 67)
+            color = AndroidColor.rgb(107, 23, 36)
             style = AndroidPaint.Style.STROKE
             strokeWidth = 6.5f
             strokeCap = AndroidPaint.Cap.ROUND
@@ -649,40 +1086,48 @@ fun HandwrittenSignatureCanvasPad(
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "Desenhe sua assinatura / rubrica abaixo:",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = NavyPrimary
+                text = "Desenhe sua rubrica:",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = WinePrimary,
+                modifier = Modifier.weight(1f)
             )
             TextButton(
                 onClick = {
                     paths.clear()
                     currentPoints = emptyList()
                     onSignatureChanged(false) { null }
-                }
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.wrapContentWidth()
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = null,
-                    modifier = Modifier.size(15.dp)
+                    tint = WinePrimary,
+                    modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Limpar Quadro", fontSize = 12.sp)
+                Text(
+                    text = "Limpar",
+                    fontSize = 11.5.sp,
+                    color = WinePrimary,
+                    softWrap = false
+                )
             }
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(155.dp)
+                .height(150.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFFFAFBFD))
-                .border(1.5.dp, Color(0xFFB8C4D9), RoundedCornerShape(10.dp))
+                .background(Color(0xFFFCFAF9))
+                .border(1.5.dp, CardBorder, RoundedCornerShape(10.dp))
                 .onSizeChanged { canvasSize = it }
                 .pointerInput(Unit) {
                     detectDragGestures(
@@ -707,11 +1152,10 @@ fun HandwrittenSignatureCanvasPad(
                     )
                 }
         ) {
-            // Linha guia de assinatura
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val guideY = size.height * 0.76f
                 drawLine(
-                    color = Color(0xFFD0D9E8),
+                    color = Color(0xFFE2DCD8),
                     start = Offset(24f, guideY),
                     end = Offset(size.width - 24f, guideY),
                     strokeWidth = 2f
@@ -728,7 +1172,7 @@ fun HandwrittenSignatureCanvasPad(
                         }
                         drawPath(
                             path = composePath,
-                            color = NavyPrimary,
+                            color = WinePrimary,
                             style = Stroke(
                                 width = 6.5f,
                                 cap = StrokeCap.Round,
@@ -741,9 +1185,9 @@ fun HandwrittenSignatureCanvasPad(
 
             if (paths.isEmpty() && currentPoints.isEmpty()) {
                 Text(
-                    text = "Assine aqui com o dedo ou caneta touch",
+                    text = "Rubrique com o dedo ou caneta stylus",
                     fontSize = 12.sp,
-                    color = Color(0xFF9AA5B8),
+                    color = MutedText,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }

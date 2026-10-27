@@ -57,7 +57,6 @@ interface LetsSignDao {
 
     /**
      * Regra de negócio de isolamento:
-     * "Dados e documentos de um usuário não poderão ser acessados por outro sem que sejam enviados."
      * Retorna apenas documentos com status != RASCUNHO nos quais o signatário logado participa.
      */
     @Transaction
@@ -96,6 +95,9 @@ interface LetsSignDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAuditEvents(events: List<AuditEventEntity>)
 
+    @Query("SELECT * FROM audit_events ORDER BY timestamp DESC LIMIT 300")
+    fun observeAllAuditEvents(): Flow<List<AuditEventEntity>>
+
     @Query(
         """
         UPDATE document_signers
@@ -113,4 +115,26 @@ interface LetsSignDao {
         """
     )
     suspend fun syncPendingFieldSignerName(userId: Long, fullName: String)
+
+    // ================== EXCLUSÃO DE SIGNATÁRIOS ==================
+    @Query("DELETE FROM signature_fields WHERE signerUserId = :userId")
+    suspend fun deleteSignatureFieldsBySignerUserId(userId: Long): Int
+
+    @Query("DELETE FROM document_signers WHERE signerUserId = :userId")
+    suspend fun deleteDocumentSignersBySignerUserId(userId: Long): Int
+
+    @Query("DELETE FROM users WHERE id = :userId")
+    suspend fun deleteUserById(userId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM document_signers WHERE signerUserId = :userId")
+    suspend fun countDocumentSignerReferences(userId: Long): Int
+
+    @Query("DELETE FROM signature_fields WHERE signerUserId IN (SELECT id FROM users WHERE fullName IN ('Carlos Eduardo Mendes', 'Bruno Zamboni') OR LOWER(email) IN ('carlos@empresa.com.br', 'bruno@assinaja.com.br'))")
+    suspend fun purgeLegacyFields(): Int
+
+    @Query("DELETE FROM document_signers WHERE signerUserId IN (SELECT id FROM users WHERE fullName IN ('Carlos Eduardo Mendes', 'Bruno Zamboni') OR LOWER(email) IN ('carlos@empresa.com.br', 'bruno@assinaja.com.br'))")
+    suspend fun purgeLegacyDocumentSigners(): Int
+
+    @Query("DELETE FROM users WHERE fullName IN ('Carlos Eduardo Mendes', 'Bruno Zamboni') OR LOWER(email) IN ('carlos@empresa.com.br', 'bruno@assinaja.com.br')")
+    suspend fun purgeLegacyUsers(): Int
 }

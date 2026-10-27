@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import br.com.fiap.letssign.data.local.AuditEventEntity
 import br.com.fiap.letssign.data.local.DocumentFullDetails
 import br.com.fiap.letssign.data.local.UserEntity
 import br.com.fiap.letssign.data.repository.LetsSignRepository
@@ -41,10 +42,10 @@ data class DocumentWizardUiState(
     val activeSignerIdForPlacement: Long? = null,
     val currentPageIndex: Int = 0,
     val signatureFields: List<DraftSignatureField> = emptyList(),
-    val invitationMessage: String = "Prezado(a), encaminhamos este instrumento jurídico para conferência e assinatura eletrônica/digital na plataforma LetsSign.",
+    val invitationMessage: String = "Prezado(a), encaminhamos este documento para conferência e assinatura eletrônica/digital na plataforma AssinaJÁ.",
     val version: Int = 1,
     val parentDocumentId: Long? = null,
-    val dispatchIdempotencyKey: String = "LS-${UUID.randomUUID().toString().uppercase().take(12)}",
+    val dispatchIdempotencyKey: String = "AJ-${UUID.randomUUID().toString().uppercase().take(10)}",
     val isDispatching: Boolean = false,
     val dispatchError: String? = null,
     val simulateFailureOnNextAttempt: Boolean = false
@@ -73,6 +74,9 @@ class LetsSignViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val adminDocuments: StateFlow<List<DocumentFullDetails>> = repository.observeAllDocumentsForAdmin()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allAuditEvents: StateFlow<List<AuditEventEntity>> = repository.observeAllAuditEvents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -148,7 +152,6 @@ class LetsSignViewModel(
                     } else {
                         "Dados de '${saved.fullName}' atualizados com sucesso!"
                     }
-                    // Se o signatário editado estiver no Wizard atual, sincroniza seus dados
                     _wizardState.update { state ->
                         val updatedSigners = state.selectedSigners.map { s ->
                             if (s.userId == saved.id) {
@@ -178,18 +181,45 @@ class LetsSignViewModel(
         }
     }
 
+    fun deleteSigner(
+        userId: Long,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.deleteSigner(userId)
+            result.fold(
+                onSuccess = {
+                    _uiNotification.value = "Signatário removido com sucesso!"
+                    _wizardState.update { state ->
+                        state.copy(
+                            selectedSigners = state.selectedSigners.filterNot { it.userId == userId },
+                            signatureFields = state.signatureFields.filterNot { it.signerUserId == userId }
+                        )
+                    }
+                    onSuccess()
+                },
+                onFailure = { err ->
+                    onError(err.message ?: "Erro ao remover signatário.")
+                }
+            )
+        }
+    }
+
     // ================== FLUXO WIZARD DE ENVIO DE DOCUMENTO ==================
     fun startNewDocumentWizard() {
         _wizardState.value = DocumentWizardUiState(
-            dispatchIdempotencyKey = "LS-${UUID.randomUUID().toString().uppercase().take(12)}"
+            dispatchIdempotencyKey = "AJ-${UUID.randomUUID().toString().uppercase().take(10)}"
         )
     }
 
-    /**
-     * Regra de Negócio:
-     * "O documento enviado e suas configurações devem ser preservados.
-     * Alterações posteriores deverão gerar uma nova versão e um novo fluxo."
-     */
+    fun startNewDocumentWizardWithPdf(context: Context, uri: Uri) {
+        _wizardState.value = DocumentWizardUiState(
+            dispatchIdempotencyKey = "AJ-${UUID.randomUUID().toString().uppercase().take(10)}"
+        )
+        importPdfFromUri(context, uri)
+    }
+
     fun startNewVersionFromDocument(existing: DocumentFullDetails, onReady: () -> Unit) {
         val doc = existing.document
         val draftSigners = existing.signers.map { s ->
@@ -214,7 +244,8 @@ class LetsSignViewModel(
                 xRatio = f.xRatio,
                 yRatio = f.yRatio,
                 widthRatio = f.widthRatio,
-                heightRatio = f.heightRatio
+                heightRatio = f.heightRatio,
+                fieldType = f.fieldType
             )
         }
 
@@ -233,7 +264,7 @@ class LetsSignViewModel(
             invitationMessage = doc.invitationMessage,
             version = doc.version + 1,
             parentDocumentId = doc.id,
-            dispatchIdempotencyKey = "LS-${UUID.randomUUID().toString().uppercase().take(12)}"
+            dispatchIdempotencyKey = "AJ-${UUID.randomUUID().toString().uppercase().take(10)}"
         )
         _uiNotification.value = "Criando Nova Versão (v${doc.version + 1}). O documento original v${doc.version} permanece preservado."
         onReady()
@@ -266,7 +297,6 @@ class LetsSignViewModel(
                     validation.fileName.removeSuffix(".pdf").replace("_", " ")
                 }
                 _wizardState.update { state ->
-                    // Remove campos de páginas que não existam no novo PDF
                     val validFields = state.signatureFields.filter { it.pageIndex < validation.pageCount }
                     state.copy(
                         isProcessingPdf = false,
@@ -302,8 +332,8 @@ class LetsSignViewModel(
                 _wizardState.update { state ->
                     state.copy(
                         isProcessingPdf = false,
-                        title = state.title.ifBlank { "Contrato de Honorários Advocatícios" },
-                        description = state.description.ifBlank { "Instrumento Particular - Consultoria e Contencioso Cível" },
+                        title = state.title.ifBlank { "Contrato de Prestação de Serviços" },
+                        description = state.description.ifBlank { "Instrumento Comercial e Operacional Corporativo" },
                         fileName = validation.fileName,
                         internalPdfPath = validation.internalFilePath,
                         pageCount = validation.pageCount,
@@ -327,7 +357,7 @@ class LetsSignViewModel(
     fun simulateCorruptedPdfSelection() {
         _wizardState.update {
             it.copy(
-                pdfValidationError = "Arquivo inválido ou corrompido: O cabeçalho %PDF não pôde ser processado pelo motor PdfRenderer. Por favor, selecione um arquivo PDF íntegro."
+                pdfValidationError = "Arquivo inválido ou corrompido: O cabeçalho %PDF não pôde ser processado pelo leitor. Por favor, selecione um arquivo íntegro."
             )
         }
     }
@@ -376,10 +406,6 @@ class LetsSignViewModel(
         }
     }
 
-    /**
-     * Permite substituir um signatário já selecionado no documento por outro signatário cadastrado,
-     * preservando os campos de assinatura que já haviam sido posicionados para ele no PDF.
-     */
     fun replaceSignerInDraft(oldUserId: Long, newUser: UserEntity) {
         _wizardState.update { state ->
             if (state.selectedSigners.any { it.userId == newUser.id }) {
@@ -451,18 +477,21 @@ class LetsSignViewModel(
         }
     }
 
-    fun addSignatureFieldToCurrentPage() {
+    fun addSignatureFieldToCurrentPage(fieldType: br.com.fiap.letssign.domain.model.FieldType = br.com.fiap.letssign.domain.model.FieldType.ASSINATURA) {
         _wizardState.update { state ->
             val activeSigner = state.selectedSigners.find { it.userId == state.activeSignerIdForPlacement }
                 ?: state.selectedSigners.firstOrNull()
                 ?: return@update state
 
-            // Calcula deslocamento em cascata para não sobrepor caso adicione múltiplos campos na mesma página
             val countOnPage = state.signatureFields.count { it.pageIndex == state.currentPageIndex }
-            val defaultW = 0.42f
-            val defaultH = 0.12f
+            val (defaultW, defaultH) = when (fieldType) {
+                br.com.fiap.letssign.domain.model.FieldType.ASSINATURA -> 0.44f to 0.12f
+                br.com.fiap.letssign.domain.model.FieldType.RUBRICA -> 0.38f to 0.10f
+                br.com.fiap.letssign.domain.model.FieldType.CPF -> 0.32f to 0.08f
+                br.com.fiap.letssign.domain.model.FieldType.DATA -> 0.28f to 0.07f
+            }
             val offsetX = (0.08f + (countOnPage % 2) * 0.44f).coerceAtMost(1f - defaultW)
-            val offsetY = (0.62f + (countOnPage / 2) * 0.14f).coerceAtMost(1f - defaultH)
+            val offsetY = (0.62f + (countOnPage / 2) * 0.10f).coerceAtMost(1f - defaultH)
 
             val newField = DraftSignatureField(
                 id = UUID.randomUUID().toString(),
@@ -474,7 +503,8 @@ class LetsSignViewModel(
                 xRatio = offsetX,
                 yRatio = offsetY,
                 widthRatio = defaultW,
-                heightRatio = defaultH
+                heightRatio = defaultH,
+                fieldType = fieldType
             ).clamped()
 
             state.copy(
@@ -540,11 +570,10 @@ class LetsSignViewModel(
             result.fold(
                 onSuccess = { docId ->
                     _wizardState.update { it.copy(isDispatching = false, dispatchError = null) }
-                    _uiNotification.value = "Documento enviado com sucesso! Solicitações disparadas aos signatários."
+                    _uiNotification.value = "Documento enviado com sucesso! Convites preparados no AssinaJÁ."
                     onSuccess(docId)
                 },
                 onFailure = { err ->
-                    // Desativa a simulação de falha após o erro para que o botão "Tentar Novamente" funcione sem duplicar
                     _wizardState.update {
                         it.copy(
                             isDispatching = false,
@@ -557,13 +586,21 @@ class LetsSignViewModel(
         }
     }
 
-    // ================== ACOMPANHAMENTO & ASSINATURA PELO SIGNATÁRIO ==================
+    // ================== ACOMPANHAMENTO, COMPARTILHAMENTO & ASSINATURA ==================
     fun observeDocumentDetails(documentId: Long) = repository.observeDocumentDetails(documentId)
 
     fun recordDocumentViewed(documentId: Long) {
         val user = _currentUser.value ?: return
         viewModelScope.launch {
             repository.recordDocumentViewedBySigner(documentId, user)
+        }
+    }
+
+    fun recordInviteShared(documentId: Long, channel: String) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.recordInviteShared(documentId, channel, user)
+            _uiNotification.value = "Link copiado e registrado para envio via $channel!"
         }
     }
 
@@ -588,11 +625,60 @@ class LetsSignViewModel(
             )
             result.fold(
                 onSuccess = { updated ->
-                    _uiNotification.value = "Assinatura registrada e gravada no PDF com validade jurídica!"
+                    _uiNotification.value = "Assinatura registrada e carimbada no PDF oficial AssinaJÁ!"
                     onSuccess(updated)
                 },
                 onFailure = { err ->
                     onError(err.message ?: "Erro ao processar assinatura.")
+                }
+            )
+        }
+    }
+
+    fun rejectDocumentAsCurrentSigner(
+        documentId: Long,
+        reason: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            val result = repository.rejectDocument(documentId, user, reason)
+            result.fold(
+                onSuccess = {
+                    _uiNotification.value = "Documento formalmente rejeitado."
+                    onSuccess()
+                },
+                onFailure = { err ->
+                    onError(err.message ?: "Erro ao registrar recusa.")
+                }
+            )
+        }
+    }
+
+    fun exportDocumentToDownloads(
+        context: Context,
+        documentId: Long,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val details = repository.getDocumentDetails(documentId)
+            if (details == null) {
+                onError("Documento não encontrado para exportação.")
+                return@launch
+            }
+            val doc = details.document
+            val safeFileName = "${doc.title}_v${doc.version}_Assinado.pdf"
+            val result = PdfEngine.exportPdfToPublicDownloads(context, doc.currentPdfPath, safeFileName)
+            result.fold(
+                onSuccess = { msg ->
+                    _uiNotification.value = msg
+                    onSuccess(msg)
+                },
+                onFailure = { err ->
+                    val errorMsg = err.message ?: "Erro ao salvar PDF no dispositivo."
+                    onError(errorMsg)
                 }
             )
         }

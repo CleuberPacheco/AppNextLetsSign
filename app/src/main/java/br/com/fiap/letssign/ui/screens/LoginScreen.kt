@@ -23,12 +23,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -52,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -60,10 +60,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.fiap.letssign.data.local.UserEntity
 import br.com.fiap.letssign.domain.model.UserRole
+import br.com.fiap.letssign.ui.components.AssinaJaLogo
+import br.com.fiap.letssign.ui.theme.CardBorder
+import br.com.fiap.letssign.ui.theme.CardWhite
+import br.com.fiap.letssign.ui.theme.CharcoalText
 import br.com.fiap.letssign.ui.theme.ErrorRed
-import br.com.fiap.letssign.ui.theme.NavyPrimary
-import br.com.fiap.letssign.ui.theme.NavySecondary
-import br.com.fiap.letssign.ui.theme.TealAccent
+import br.com.fiap.letssign.ui.theme.GoldChampagne
+import br.com.fiap.letssign.ui.theme.GoldLight
+import br.com.fiap.letssign.ui.theme.IvoryBackground
+import br.com.fiap.letssign.ui.theme.MutedText
+import br.com.fiap.letssign.ui.theme.WineDark
+import br.com.fiap.letssign.ui.theme.WineLight
+import br.com.fiap.letssign.ui.theme.WinePrimary
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -73,7 +81,7 @@ fun LoginScreen(
     onClearError: () -> Unit,
     onLogin: (email: String, password: String) -> Unit
 ) {
-    var email by remember { mutableStateOf("admin@letssign.com.br") }
+    var email by remember { mutableStateOf("admin@assinaja.com.br") }
     var password by remember { mutableStateOf("admin123") }
     var passwordVisible by remember { mutableStateOf(false) }
 
@@ -82,91 +90,59 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(IvoryBackground)
             .verticalScroll(scrollState)
     ) {
-        // Hero Header Institucional LetsSign Jurídico
+        // Cabeçalho Hero Luxuoso AssinaJÁ em tom Vinho Nobre
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(NavyPrimary, NavySecondary)
+                        colors = listOf(WineDark, WinePrimary)
                     )
                 )
-                .padding(horizontal = 24.dp, vertical = 36.dp)
+                .padding(horizontal = 24.dp, vertical = 34.dp)
         ) {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(TealAccent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Balance,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = "LetsSign Jurídico",
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "Gestão e Assinatura Digital • FIAP Sprint 1",
-                            color = Color(0xFFB8C9E8),
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                AssinaJaLogo(
+                    size = 46.dp,
+                    showText = true,
+                    isLightOnDark = true
+                )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                Surface(
-                    color = Color.White.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VerifiedUser,
-                            contentDescription = null,
-                            tint = Color(0xFF64FFDA),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Suporte a Assinatura Eletrônica Simples, Avançada (Canvas + Token) e Qualificada ICP-Brasil (MP 2.200-2/2001 e Lei 14.063/2020).",
-                            color = Color.White,
-                            fontSize = 11.5.sp,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
+                Text(
+                    text = "Automação, Gestão e Assinatura Eletrônica e Digital",
+                    fontSize = 13.5.sp,
+                    color = GoldChampagne,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Acesso unificado e seguro para todas as empresas e signatários.",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                    lineHeight = 16.sp
+                )
             }
         }
 
+        // Formulário de Login
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = CardWhite),
                 elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                border = BorderStroke(1.dp, CardBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -174,22 +150,23 @@ fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "Acesso ao Sistema",
-                        fontSize = 18.sp,
+                        text = "Entrar na Plataforma",
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = NavyPrimary
+                        color = WinePrimary
                     )
+
                     Text(
-                        text = "Autentique-se com perfil Administrador (gestão e envio de PDFs) ou Signatário (visualização e assinatura de documentos recebidos).",
-                        fontSize = 12.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Informe seu e-mail e senha de acesso previamente cadastrados.",
+                        fontSize = 12.sp,
+                        color = MutedText
                     )
 
                     if (authError != null) {
                         Surface(
                             color = Color(0xFFFFEBEE),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.35f)),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.3f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -207,12 +184,18 @@ fun LoginScreen(
                             email = it
                             onClearError()
                         },
-                        label = { Text("E-mail de acesso") },
+                        label = { Text("E-mail corporativo ou pessoal") },
+                        placeholder = { Text("Ex: seuemail@empresa.com.br") },
                         leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                tint = WinePrimary
+                            )
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -222,79 +205,129 @@ fun LoginScreen(
                             password = it
                             onClearError()
                         },
-                        label = { Text("Senha") },
+                        label = { Text("Senha de autenticação") },
+                        placeholder = { Text("Digite sua senha") },
                         leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = WinePrimary
+                            )
                         },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = "Mostrar/Ocultar senha"
+                                    contentDescription = "Alternar visibilidade",
+                                    tint = WinePrimary
                                 )
                             }
                         },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         singleLine = true,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Button(
                         onClick = { onLogin(email, password) },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = WinePrimary),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Entrar na Plataforma", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Key, contentDescription = null, tint = GoldChampagne, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Autenticar com Segurança",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
 
-            // Seletor rápido de perfis cadastrados no banco Room para agilizar a demonstração Admin <-> Signatário
+            // Atalhos rápidos para troca de perfil em testes
             Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEEF3FB)),
-                border = BorderStroke(1.dp, Color(0xFFD0DCF0)),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardWhite),
+                border = BorderStroke(1.dp, CardBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = GoldChampagne,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "USUÁRIOS DISPONÍVEIS NO DISPOSITIVO (MVP)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = WinePrimary,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
-                        text = "Troca Rápida de Perfil (Contas no Banco Room)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NavyPrimary
-                    )
-                    Text(
-                        text = "Toque em uma conta abaixo para preencher automaticamente as credenciais. Novos signatários cadastrados pelo Admin aparecem aqui automaticamente:",
+                        text = "Toque em uma credencial abaixo para preencher automaticamente:",
                         fontSize = 11.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MutedText
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        allUsers.forEach { user ->
-                            val isAdmin = user.role == UserRole.ADMIN
+                        // Admin padrão
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = WineLight,
+                            border = BorderStroke(1.dp, WinePrimary.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable {
+                                email = "admin@assinaja.com.br"
+                                password = "admin123"
+                                onClearError()
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AdminPanelSettings,
+                                    contentDescription = null,
+                                    tint = WinePrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Admin AssinaJÁ",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = WinePrimary
+                                )
+                            }
+                        }
+
+                        // Signatários cadastrados
+                        allUsers.filter { it.role == UserRole.SIGNATARIO }.forEach { user ->
                             Surface(
-                                color = if (email.equals(user.email, ignoreCase = true)) {
-                                    if (isAdmin) NavyPrimary else TealAccent
-                                } else {
-                                    Color.White
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isAdmin) NavyPrimary.copy(alpha = 0.4f) else TealAccent.copy(alpha = 0.4f)
-                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                color = GoldLight,
+                                border = BorderStroke(1.dp, GoldChampagne.copy(alpha = 0.4f)),
                                 modifier = Modifier.clickable {
                                     email = user.email
                                     password = user.password
@@ -303,56 +336,46 @@ fun LoginScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
-                                    val selected = email.equals(user.email, ignoreCase = true)
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (selected) Color.White.copy(alpha = 0.2f)
-                                                else if (isAdmin) Color(0xFFE0ECFF)
-                                                else Color(0xFFD5F5EE)
-                                            )
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isAdmin) Icons.Default.AdminPanelSettings else Icons.Default.Person,
-                                            contentDescription = null,
-                                            tint = if (selected) Color.White else if (isAdmin) NavyPrimary else TealAccent,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = "${user.fullName} (${user.role.label})",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (selected) Color.White else NavyPrimary
-                                        )
-                                        Text(
-                                            text = user.email,
-                                            fontSize = 10.5.sp,
-                                            color = if (selected) Color.White.copy(alpha = 0.85f) else Color(0xFF5A6577)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = Color(0xFF7A5816),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${user.fullName.take(16)} (Signatário)",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF5A4418)
+                                    )
                                 }
                             }
                         }
                     }
-
-                    if (allUsers.count { it.role == UserRole.SIGNATARIO } == 0) {
-                        HorizontalDivider(color = Color(0xFFD0DCF0))
-                        Text(
-                            text = "Banco iniciado limpo (apenas Admin padrão). Entre como Admin, cadastre os Signatários e envie um PDF; depois volte aqui para logar como Signatário e assinar!",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TealAccent
-                        )
-                    }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Rodapé Institucional
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "AssinaJÁ • Tecnologia Segura de Assinatura Digital e Eletrônica",
+                    fontSize = 11.sp,
+                    color = MutedText,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Em conformidade com a MP 2.200-2/2001 e a Lei nº 14.063/2020",
+                    fontSize = 10.sp,
+                    color = MutedText.copy(alpha = 0.8f)
+                )
             }
         }
     }
